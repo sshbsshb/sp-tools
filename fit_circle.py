@@ -1,4 +1,4 @@
-## fit circle with given radius from the imported file of a GDS files
+## fit circle with given radius from the imported GDS file
 ## to be used to remove small dotted connected features
 ## can be used to fit other shape by replacing the sketch fuction
 
