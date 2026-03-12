@@ -1,0 +1,83 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Material properties
+k_cu = 400.0    # W/m·K (Bulk copper, modify for nanoscale effects if needed)
+k_sio2 = 1.4    # W/m·K (SiO2)
+
+# Define arrays for diameter and pitch (in nm)
+diameters = [d for d in range(50, 250, 50)] #np.linspace(50, 200, 100)  # 50 nm to 200 nm
+pitches = [p for p in range(100, 350, 50)] #np.linspace(100, 300, 100)   # 100 nm to 300 nm
+
+# Create a meshgrid to evaluate all combinations of D and P
+D, P = np.meshgrid(diameters, pitches)
+
+# Calculate Volume Fraction of Copper (V_cu)
+# Formula assumes a square array pattern
+V_cu = (np.pi / 4.0) * (D / P)**2
+
+# --- Physical Constraint Handling ---
+# Vias cannot physically overlap (Diameter > Pitch is impossible in a square array)
+# We mask out invalid configurations by setting them to NaN (Not a Number)
+mask = D > P
+V_cu[mask] = np.nan
+
+# --- Calculate Thermal Conductivities ---
+# 1. Through-plane thermal conductivity (k_z) - Rule of Mixtures
+k_z = V_cu * k_cu + (1 - V_cu) * k_sio2
+
+# 2. In-plane thermal conductivity (k_xy) - Maxwell-Garnett Effective Medium
+numerator = k_cu + k_sio2 + V_cu * (k_cu - k_sio2)
+denominator = k_cu + k_sio2 - V_cu * (k_cu - k_sio2)
+k_xy = k_sio2 * (numerator / denominator)
+
+print("Diameter (nm):", diameters)
+print("Pitch (nm):", pitches)
+print("Volume Fraction of Copper (V_cu):\n", V_cu)
+print("Through-plane Thermal Conductivity (k_z):\n", k_z)
+print("In-plane Thermal Conductivity (k_xy):\n", k_xy)
+
+# # --- Plotting the Results ---
+# fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+# # Plot Through-plane (k_z)
+# cp1 = ax1.contourf(D, P, k_z, levels=20, cmap='inferno')
+# fig.colorbar(cp1, ax=ax1, label='Through-plane k (W/m·K)')
+# ax1.set_title('Through-Plane Thermal Conductivity ($k_z$)')
+# ax1.set_xlabel('Via Diameter (nm)')
+# ax1.set_ylabel('Pitch (nm)')
+
+# # Plot In-plane (k_xy)
+# cp2 = ax2.contourf(D, P, k_xy, levels=20, cmap='inferno')
+# fig.colorbar(cp2, ax=ax2, label='In-plane k (W/m·K)')
+# ax2.set_title('In-Plane Thermal Conductivity ($k_{x,y}$)')
+# ax2.set_xlabel('Via Diameter (nm)')
+# ax2.set_ylabel('Pitch (nm)')
+
+# plt.tight_layout()
+# plt.show()
+
+# Create an empty list to store our formatted rows
+table_data = []
+
+for i in range(len(pitches)):
+    row = []
+    for j in range(len(diameters)):
+        val_kz = k_z[i, j]
+        val_kxy = k_xy[i, j]
+        
+        # Check if the value is NaN (invalid geometry)
+        if np.isnan(val_kz):
+            row.append("Invalid (D>P)")
+        else:
+            # Format as "kz / kxy" with 1 decimal place for kz and 2 for kxy
+            row.append(f"{val_kz:.1f} / {val_kxy:.2f}")
+    table_data.append(row)
+
+# Create a Pandas DataFrame
+df = pd.DataFrame(table_data, index=pitches, columns=diameters)
+
+# Name the axes for clarity
+# df.index.name = "Pitch (nm) ↓ \\ Dia (nm) →"
+df.to_csv("thermal_conductivity_table.csv")
